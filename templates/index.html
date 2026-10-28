@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Spam Message Detector | SMS Classifier</title>
+  <meta name="description" content="Intelligent SMS Spam Detection using TF-IDF and Multinomial Naive Bayes Machine Learning.">
+  
+  <!-- Favicon icon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+  
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ================= 1. SITE HEADER & NAVIGATION MENU ================= -->
+  <header class="site-header">
+    <div class="container nav-container">
+      <a href="/" class="brand-logo">
+        <div class="brand-icon">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <span>SpamGuard <span class="gradient-text">AI</span></span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li>
+            <button class="nav-item-btn active" data-tab="home">
+              <i class="fa-solid fa-house"></i> Home & Detector
+            </button>
+          </li>
+          <li>
+            <button class="nav-item-btn" data-tab="history">
+              <i class="fa-solid fa-clock-rotate-left"></i> History
+            </button>
+          </li>
+          <li>
+            <button class="nav-item-btn" data-tab="analytics">
+              <i class="fa-solid fa-chart-pie"></i> Analytics
+            </button>
+          </li>
+          <li>
+            <button class="nav-item-btn" data-tab="about">
+              <i class="fa-solid fa-brain"></i> About AI
+            </button>
+          </li>
+          <li>
+            <button class="nav-item-btn" data-tab="deploy">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Render Deploy
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div>
+        <button class="deploy-btn" data-navigate-tab="deploy">
+          <i class="fa-solid fa-rocket"></i> Deploy on Render
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ================= TAB 1: HOME PAGE & DETECTOR ================= -->
+    <section id="tab-home">
+      <!-- Hero Section -->
+      <div class="hero-section">
+        <div class="badge-tag">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> NLP & Machine Learning Engine
+        </div>
+        <h1 class="hero-title">
+          AI-Powered <span class="gradient-text">Spam Message</span> Detector
+        </h1>
+        <p class="hero-subtitle">
+          Instantly classify SMS messages as legitimate or spam with high precision using TF-IDF feature extraction and Multinomial Naive Bayes.
+        </p>
+      </div>
+
+      <!-- Dashboard Statistics Overview Tiles -->
+      <div class="stats-grid">
+        <div class="glass-panel stat-card">
+          <div class="stat-icon total">
+            <i class="fa-solid fa-envelope-open-text"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Total Analyzed</span>
+            <span class="stat-value" id="overview-total">{{ stats.total_analyzed }}</span>
+            <span class="stat-meta">Processed messages</span>
+          </div>
+        </div>
+
+        <div class="glass-panel stat-card">
+          <div class="stat-icon spam">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Spam Blocked</span>
+            <span class="stat-value" id="overview-spam">{{ stats.spam_count }}</span>
+            <span class="stat-meta">{{ stats.spam_percentage }}% spam rate</span>
+          </div>
+        </div>
+
+        <div class="glass-panel stat-card">
+          <div class="stat-icon ham">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Legitimate (Ham)</span>
+            <span class="stat-value" id="overview-ham">{{ stats.ham_count }}</span>
+            <span class="stat-meta">{{ stats.ham_percentage }}% authentic</span>
+          </div>
+        </div>
+
+        <div class="glass-panel stat-card">
+          <div class="stat-icon accuracy">
+            <i class="fa-solid fa-bullseye"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Model Accuracy</span>
+            <span class="stat-value">{{ metrics.accuracy }}%</span>
+            <span class="stat-meta">MultinomialNB + TF-IDF</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Detector Layout: Message Input + Prediction Results -->
+      <div class="detector-layout">
+        
+        <!-- 2. Message Input Component -->
+        <div class="glass-panel input-card">
+          <div class="card-header-flex">
+            <h2 class="card-title">
+              <i class="fa-solid fa-message gradient-text"></i> Enter SMS Message
+            </h2>
+            <span class="nav-badge">Real-Time NLP</span>
+          </div>
+
+          <div class="textarea-container">
+            <textarea 
+              id="message-input" 
+              class="message-textarea" 
+              placeholder="Paste or type an SMS message here to classify... (e.g. 'WINNER! You have won a £1,000 cash prize. Call now!')"
+              maxlength="5000"
+            ></textarea>
+            <div class="textarea-footer">
+              <span>Shortcuts: <kbd>Ctrl+Enter</kbd> to analyze</span>
+              <span><span id="char-count">0</span> chars | <span id="word-count">0</span> words</span>
+            </div>
+          </div>
+
+          <!-- Quick Test Samples -->
+          <div class="samples-wrapper">
+            <span class="samples-label"><i class="fa-solid fa-bolt"></i> Quick Test Examples:</span>
+            <div class="samples-pills">
+              <button class="sample-pill spam-pill" data-sample="spam1">
+                🚨 Prize Claim Spam
+              </button>
+              <button class="sample-pill spam-pill" data-sample="spam2">
+                🚨 Gift Card Phishing
+              </button>
+              <button class="sample-pill spam-pill" data-sample="spam3">
+                🚨 Lottery Contest Spam
+              </button>
+              <button class="sample-pill ham-pill" data-sample="ham1">
+                💬 Lunch Meeting
+              </button>
+              <button class="sample-pill ham-pill" data-sample="ham2">
+                💬 Traffic Update
+              </button>
+              <button class="sample-pill ham-pill" data-sample="ham3">
+                💬 Project Report Sync
+              </button>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="button-group">
+            <button id="btn-analyze" class="btn-primary">
+              <i class="fa-solid fa-magnifying-glass"></i> Analyze Message
+            </button>
+            <button id="btn-clear" class="btn-secondary">
+              <i class="fa-solid fa-arrow-rotate-left"></i> Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 & 4. AI Prediction Engine Results Component -->
+        <div class="glass-panel results-card">
+          
+          <!-- Empty State -->
+          <div id="results-empty" class="results-empty-state">
+            <div class="empty-icon">
+              <i class="fa-solid fa-microchip"></i>
+            </div>
+            <h3>AI Prediction Engine Ready</h3>
+            <p style="font-size: 0.9rem; margin-top: 6px;">
+              Enter an SMS message on the left or select a quick sample to see probability scores and keyword detection.
+            </p>
+          </div>
+
+          <!-- Active Results Display -->
+          <div id="results-content" style="display: none;">
+            
+            <!-- Dynamic Verdict Banner -->
+            <div id="prediction-badge-box" class="prediction-badge-box is-spam">
+              <h3 id="verdict-title" class="result-verdict-title">
+                <i class="fa-solid fa-triangle-exclamation"></i> SPAM DETECTED
+              </h3>
+              <p id="verdict-subtitle" class="result-verdict-subtitle">
+                High confidence detection
+              </p>
+            </div>
+
+            <!-- Probability Confidence Bars -->
+            <div class="probability-section">
+              <div class="prob-item">
+                <div class="prob-labels">
+                  <span style="color: #f87171;"><i class="fa-solid fa-triangle-exclamation"></i> Spam Probability</span>
+                  <span id="spam-prob-val">0%</span>
+                </div>
+                <div class="prob-bar-track">
+                  <div id="spam-prob-fill" class="prob-bar-fill fill-spam" style="width: 0%;"></div>
+                </div>
+              </div>
+
+              <div class="prob-item">
+                <div class="prob-labels">
+                  <span style="color: #34d399;"><i class="fa-solid fa-shield-halved"></i> Legitimate (Ham) Probability</span>
+                  <span id="ham-prob-val">0%</span>
+                </div>
+                <div class="prob-bar-track">
+                  <div id="ham-prob-fill" class="prob-bar-fill fill-ham" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Keyword Explainability Tags -->
+            <div class="keywords-section">
+              <div class="section-mini-title">
+                <i class="fa-solid fa-tags"></i> Significant Vocabulary Influences:
+              </div>
+              <div id="result-keywords" class="keywords-cloud">
+                <!-- Injected via JavaScript -->
+              </div>
+            </div>
+
+            <!-- Pattern & Metadata Analysis -->
+            <div class="meta-grid">
+              <div>
+                <div id="meta-chars" class="meta-item-val">0</div>
+                <div class="meta-item-label">Characters</div>
+              </div>
+              <div>
+                <div id="meta-words" class="meta-item-val">0</div>
+                <div class="meta-item-label">Words</div>
+              </div>
+              <div>
+                <div id="meta-caps" class="meta-item-val">0%</div>
+                <div class="meta-item-label">Uppercase</div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="result-actions">
+              <button id="btn-copy-result" class="btn-action-small">
+                <i class="fa-regular fa-copy"></i> Copy Result
+              </button>
+              <button class="btn-action-small" data-navigate-tab="history">
+                <i class="fa-solid fa-table-list"></i> View in History
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= 5. ANALYSIS HISTORY COMPONENT ================= -->
+    <section id="tab-history" class="history-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <i class="fa-solid fa-clock-rotate-left gradient-text"></i> Analysis History
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">
+            Chronological log of messages classified by the AI engine, persisted in SQLite.
+          </p>
+        </div>
+
+        <div class="history-controls">
+          <input 
+            type="text" 
+            id="history-search" 
+            class="search-input" 
+            placeholder="Search message history..."
+          >
+          <select id="history-filter" class="filter-select">
+            <option value="all">All Messages</option>
+            <option value="spam">Spam Only</option>
+            <option value="ham">Legitimate Only</option>
+          </select>
+          <button id="btn-export-csv" class="btn-action-small" title="Export to CSV">
+            <i class="fa-solid fa-file-csv"></i> Export CSV
+          </button>
+          <button id="btn-clear-history" class="btn-action-small" style="color: #f87171;" title="Clear all history">
+            <i class="fa-solid fa-trash-can"></i> Clear All
+          </button>
+        </div>
+      </div>
+
+      <div class="glass-panel history-table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th style="width: 70px;">ID</th>
+              <th>Message Content</th>
+              <th style="width: 140px;">Classification</th>
+              <th style="width: 130px;">Confidence</th>
+              <th style="width: 170px;">Date & Time</th>
+              <th style="width: 80px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            {% for item in history %}
+            <tr id="history-row-{{ item.id }}">
+              <td style="color: var(--text-dim); font-size: 0.8rem;">#{{ item.id }}</td>
+              <td>
+                <div class="history-msg-snippet" title="{{ item.message }}">
+                  {{ item.message }}
+                </div>
+              </td>
+              <td>
+                {% if item.is_spam %}
+                  <span class="badge-status spam"><i class="fa-solid fa-triangle-exclamation"></i> Spam</span>
+                {% else %}
+                  <span class="badge-status ham"><i class="fa-solid fa-check"></i> Not Spam</span>
+                {% endif %}
+              </td>
+              <td>
+                <span style="font-weight: 600;">
+                  {% if item.is_spam %}{{ item.spam_probability }}{% else %}{{ item.ham_probability }}{% endif %}%
+                </span>
+              </td>
+              <td style="color: var(--text-dim); font-size: 0.8rem;">
+                {{ item.created_at }}
+              </td>
+              <td style="text-align: right;">
+                <button class="delete-btn" onclick="deleteHistoryItem({{ item.id }})" title="Delete record">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= 6. STATISTICS AND ANALYTICS COMPONENT ================= -->
+    <section id="tab-analytics" class="analytics-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <i class="fa-solid fa-chart-pie gradient-text"></i> Statistics & Analytics
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">
+            Real-time visual metrics, confidence distributions, and vocabulary patterns.
+          </p>
+        </div>
+        <div>
+          <button class="btn-action-small" onclick="fetchAnalyticsAndUpdateCharts()">
+            <i class="fa-solid fa-rotate-right"></i> Refresh Charts
+          </button>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <!-- Chart 1: Distribution Donut -->
+        <div class="glass-panel chart-card">
+          <h3 class="card-title">
+            <i class="fa-solid fa-chart-pie" style="color: #6366f1;"></i> Spam vs Legitimate Distribution
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="chart-distribution"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Confidence Levels -->
+        <div class="glass-panel chart-card">
+          <h3 class="card-title">
+            <i class="fa-solid fa-gauge-high" style="color: #a855f7;"></i> Confidence Score Distribution
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="chart-confidence"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 3: Activity Trends -->
+        <div class="glass-panel chart-card">
+          <h3 class="card-title">
+            <i class="fa-solid fa-chart-line" style="color: #10b981;"></i> Recent Analysis Trends
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="chart-activity"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 4: Top Spam Keywords -->
+        <div class="glass-panel chart-card">
+          <h3 class="card-title">
+            <i class="fa-solid fa-fire" style="color: #ef4444;"></i> Top Spam Predictor Vocabulary
+          </h3>
+          <div class="chart-wrapper">
+            <canvas id="chart-keywords"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 7. ABOUT AI COMPONENT ================= -->
+    <section id="tab-about" class="about-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <i class="fa-solid fa-brain gradient-text"></i> About the AI Model & Algorithms
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">
+            A deep-dive into the Natural Language Processing pipeline and Naive Bayes mathematics.
+          </p>
+        </div>
+      </div>
+
+      <div class="about-grid">
+        
+        <!-- Algorithm 1: TF-IDF Feature Extraction -->
+        <div class="glass-panel about-card">
+          <h3 class="about-card-title">
+            <i class="fa-solid fa-filter"></i> 1. TF-IDF Feature Extraction
+          </h3>
+          <p>
+            Machine learning algorithms cannot process raw text strings directly. <strong>TF-IDF</strong> (Term Frequency – Inverse Document Frequency) converts text into numerical vectors reflecting word significance.
+          </p>
+          <div class="math-formula-box">
+            TF-IDF(t, d, D) = TF(t, d) × ln[(1 + |D|) / (1 + DF(t))]
+          </div>
+          <p>
+            • <span class="code-pill">TF(t, d)</span> measures frequency of term <em>t</em> in document <em>d</em>.<br>
+            • <span class="code-pill">IDF(t, D)</span> penalizes ubiquitous words (like "the", "and") while rewarding high-discriminative tokens (like "prize", "urgent", "claim").<br>
+            • Bigrams <span class="code-pill">ngram_range=(1,2)</span> capture word pairs such as <em>"cash prize"</em> and <em>"gift card"</em>.
+          </p>
+        </div>
+
+        <!-- Algorithm 2: Multinomial Naive Bayes -->
+        <div class="glass-panel about-card">
+          <h3 class="about-card-title">
+            <i class="fa-solid fa-calculator"></i> 2. Multinomial Naive Bayes
+          </h3>
+          <p>
+            <strong>Multinomial Naive Bayes</strong> is a probabilistic classifier grounded in <strong>Bayes' Theorem</strong> with the naive assumption of conditional word independence.
+          </p>
+          <div class="math-formula-box">
+            P(Spam | W) ∝ P(Spam) × ∏ P(wᵢ | Spam)
+          </div>
+          <p>
+            • Calculates the posterior probability of a class given feature words.<br>
+            • Employs <strong>Laplace smoothing</strong> (<span class="code-pill">alpha=0.2</span>) to prevent zero-probability errors when encountering rare terms.<br>
+            • Ideal for high-dimensional, sparse text classification due to lightning-fast inference and low memory footprint.
+          </p>
+        </div>
+
+        <!-- Dataset & Evaluation -->
+        <div class="glass-panel about-card">
+          <h3 class="about-card-title">
+            <i class="fa-solid fa-database"></i> 3. SMS Spam Collection Dataset
+          </h3>
+          <p>
+            Trained on the canonical <strong>UCI SMS Spam Collection</strong>, consisting of <strong>5,572</strong> real SMS text messages tagged as legitimate (ham) or spam.
+          </p>
+          <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>Dataset Size:</span><strong>5,572 SMS Messages</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>Evaluation Accuracy:</span><strong style="color: #34d399;">{{ metrics.accuracy }}%</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>Spam Precision:</span><strong style="color: #818cf8;">{{ metrics.precision_spam }}%</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Spam Recall:</span><strong style="color: #fbbf24;">{{ metrics.recall_spam }}%</strong>
+            </div>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-dim);">
+            Precision is tuned high to prevent legitimate messages from being falsely marked as spam (low false-positive rate).
+          </p>
+        </div>
+
+        <!-- Project Objectives -->
+        <div class="glass-panel about-card">
+          <h3 class="about-card-title">
+            <i class="fa-solid fa-bullseye"></i> 4. Project Objectives & Impact
+          </h3>
+          <p>
+            SMS phishing ("smishing") and fraudulent messages cause billions of dollars in annual losses worldwide. The objectives of this project are:
+          </p>
+          <ul style="color: var(--text-muted); font-size: 0.9rem; padding-left: 1.25rem; line-height: 1.8;">
+            <li>Provide accessible, real-time protection and classification for cellular communications.</li>
+            <li>Deliver model interpretability by displaying influential trigger keywords.</li>
+            <li>Maintain historical audit trails and analytical intelligence via persistent storage.</li>
+            <li>Offer zero-configuration container-friendly deployment for cloud platforms like <strong>Render</strong>.</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= 8. RENDER DEPLOYMENT GUIDE ================= -->
+    <section id="tab-deploy" class="deploy-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <i class="fa-solid fa-cloud-arrow-up gradient-text"></i> Deploy to Render
+          </h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">
+            Step-by-step instructions to deploy this web application to Render's free tier cloud hosting.
+          </p>
+        </div>
+      </div>
+
+      <div class="glass-panel deploy-step-card">
+        <h3><span class="step-number">1</span> Push Code to GitHub</h3>
+        <p style="color: var(--text-muted); margin-top: 6px;">
+          Initialize a git repository, commit all project files, and push to your GitHub account:
+        </p>
+        <div class="code-block-display">
+git init<br>
+git add .<br>
+git commit -m "Initial commit: AI Spam Message Detector"<br>
+git branch -M main<br>
+git remote add origin https://github.com/YOUR_USERNAME/ai-spam-detector.git<br>
+git push -u origin main
+        </div>
+      </div>
+
+      <div class="glass-panel deploy-step-card">
+        <h3><span class="step-number">2</span> Create a Web Service on Render</h3>
+        <p style="color: var(--text-muted); margin-top: 6px;">
+          1. Go to <a href="https://render.com" target="_blank" style="color: #818cf8; text-decoration: underline;">Render.com</a> and sign in with GitHub.<br>
+          2. Click <strong>"New +"</strong> and select <strong>"Web Service"</strong>.<br>
+          3. Choose your repository <span class="code-pill">ai-spam-detector</span> and connect.
+        </p>
+      </div>
+
+      <div class="glass-panel deploy-step-card">
+        <h3><span class="step-number">3</span> Configure Build & Start Commands</h3>
+        <p style="color: var(--text-muted); margin-top: 6px;">
+          Render will ask for service settings. Fill them in as follows:
+        </p>
+        <div style="background: rgba(0,0,0,0.3); padding: 14px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem;">
+          <div style="margin-bottom: 8px;">• <strong>Name:</strong> <span class="code-pill">ai-spam-detector</span></div>
+          <div style="margin-bottom: 8px;">• <strong>Environment:</strong> <span class="code-pill">Python 3</span></div>
+          <div style="margin-bottom: 8px;">• <strong>Region:</strong> Select closest region (e.g. Frankfurt, Oregon, Singapore)</div>
+          <div style="margin-bottom: 8px;">• <strong>Branch:</strong> <span class="code-pill">main</span></div>
+          <div style="margin-bottom: 8px;">• <strong>Build Command:</strong> <span class="code-pill">pip install -r requirements.txt</span></div>
+          <div>• <strong>Start Command:</strong> <span class="code-pill">gunicorn app:app</span></div>
+        </div>
+      </div>
+
+      <div class="glass-panel deploy-step-card">
+        <h3><span class="step-number">4</span> Deploy & Go Live!</h3>
+        <p style="color: var(--text-muted); margin-top: 6px;">
+          Click <strong>"Create Web Service"</strong>. Render will install dependencies from <span class="code-pill">requirements.txt</span> and launch Gunicorn. In 1-2 minutes, your live URL (e.g. <span class="code-pill">https://ai-spam-detector.onrender.com</span>) will be running!
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= SITE FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div>
+        <strong>AI Spam Message Detector</strong> — Built with Python Flask, Scikit-learn, TF-IDF & Multinomial Naive Bayes.
+      </div>
+      <div>
+        <span>Ready for Render Cloud Deployment 🚀</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Custom JavaScript -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

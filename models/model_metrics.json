@@ -1,0 +1,184 @@
+{
+  "dataset_total": 5572,
+  "dataset_ham_count": 4825,
+  "dataset_spam_count": 747,
+  "test_size": 1115,
+  "accuracy": 98.21,
+  "precision_spam": 97.78,
+  "recall_spam": 88.59,
+  "f1_spam": 92.96,
+  "precision_ham": 98.27,
+  "recall_ham": 99.69,
+  "f1_ham": 98.97,
+  "confusion_matrix": {
+    "true_ham_pred_ham": 963,
+    "true_ham_pred_spam": 3,
+    "true_spam_pred_ham": 17,
+    "true_spam_pred_spam": 132
+  },
+  "vocabulary_size": 6000,
+  "top_spam_words": [
+    {
+      "word": "claim",
+      "weight": 5.53
+    },
+    {
+      "word": "prize",
+      "weight": 5.36
+    },
+    {
+      "word": "150p",
+      "weight": 5.14
+    },
+    {
+      "word": "18",
+      "weight": 4.93
+    },
+    {
+      "word": "guaranteed",
+      "weight": 4.84
+    },
+    {
+      "word": "tone",
+      "weight": 4.79
+    },
+    {
+      "word": "1000",
+      "weight": 4.75
+    },
+    {
+      "word": "ringtone",
+      "weight": 4.68
+    },
+    {
+      "word": "cs",
+      "weight": 4.66
+    },
+    {
+      "word": "500",
+      "weight": 4.65
+    },
+    {
+      "word": "awarded",
+      "weight": 4.58
+    },
+    {
+      "word": "www",
+      "weight": 4.53
+    },
+    {
+      "word": "uk",
+      "weight": 4.53
+    },
+    {
+      "word": "150ppm",
+      "weight": 4.49
+    },
+    {
+      "word": "tones",
+      "weight": 4.45
+    },
+    {
+      "word": "000",
+      "weight": 4.39
+    },
+    {
+      "word": "http",
+      "weight": 4.34
+    },
+    {
+      "word": "10p",
+      "weight": 4.26
+    },
+    {
+      "word": "valid",
+      "weight": 4.26
+    },
+    {
+      "word": "1000 cash",
+      "weight": 4.26
+    }
+  ],
+  "top_ham_words": [
+    {
+      "word": "gt",
+      "weight": 4.62
+    },
+    {
+      "word": "lt",
+      "weight": 4.61
+    },
+    {
+      "word": "lt gt",
+      "weight": 4.52
+    },
+    {
+      "word": "lor",
+      "weight": 4.4
+    },
+    {
+      "word": "da",
+      "weight": 4.38
+    },
+    {
+      "word": "later",
+      "weight": 4.35
+    },
+    {
+      "word": "doing",
+      "weight": 3.94
+    },
+    {
+      "word": "lol",
+      "weight": 3.92
+    },
+    {
+      "word": "ask",
+      "weight": 3.82
+    },
+    {
+      "word": "sure",
+      "weight": 3.68
+    },
+    {
+      "word": "said",
+      "weight": 3.67
+    },
+    {
+      "word": "fine",
+      "weight": 3.64
+    },
+    {
+      "word": "come",
+      "weight": 3.63
+    },
+    {
+      "word": "morning",
+      "weight": 3.63
+    },
+    {
+      "word": "gonna",
+      "weight": 3.62
+    },
+    {
+      "word": "ll later",
+      "weight": 3.56
+    },
+    {
+      "word": "coming",
+      "weight": 3.52
+    },
+    {
+      "word": "home",
+      "weight": 3.52
+    },
+    {
+      "word": "sorry ll",
+      "weight": 3.51
+    },
+    {
+      "word": "yup",
+      "weight": 3.51
+    }
+  ]
+}
