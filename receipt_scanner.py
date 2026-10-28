@@ -1,6 +1,7 @@
 """
 Receipt Scam Scanner Module
-Uses Gemini Vision API and Groq API to detect fake, manipulated, or spoofed transaction receipts.
+Uses Gemini Vision API (gemini-2.5-flash) and Groq API (openai/gpt-oss-20b) to detect fake, manipulated, or spoofed transaction receipts.
+Loads keys securely from environment variables (.env).
 """
 
 import os
@@ -10,6 +11,38 @@ import re
 import requests
 from PIL import Image
 import io
+
+
+def load_env_file():
+    """Load key-value pairs from .env if present without exposing secrets in code."""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k and not os.environ.get(k):
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+
+load_env_file()
+
+
+def get_gemini_key(user_key: str = None) -> str:
+    """Retrieve Gemini key from argument, environment, or .env."""
+    return (user_key or "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+
+
+def get_groq_key(user_key: str = None) -> str:
+    """Retrieve Groq key from argument, environment, or .env."""
+    return (user_key or "").strip() or os.environ.get("GROQ_API_KEY", "").strip()
+
 
 SYSTEM_INSTRUCTION = """
 You are an expert digital forensics examiner specializing in payment fraud detection, receipt forgery, and mobile banking spoof APK analysis.
@@ -81,23 +114,22 @@ def encode_image_base64(image_bytes: bytes) -> str:
 def clean_json_response(raw_text: str) -> dict:
     """Extract and parse JSON from LLM response text."""
     raw_text = raw_text.strip()
-    # Remove markdown code block fences if present
     match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_text)
     if match:
         raw_text = match.group(1).strip()
     return json.loads(raw_text)
 
 
-def analyze_with_gemini(image_bytes: bytes, mime_type: str, api_key: str) -> dict:
-    """Perform visual receipt fraud analysis using Google Gemini multimodal vision."""
-    api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
-    if not api_key:
-        raise ValueError("Google Gemini API Key is missing. Please provide a key or set GEMINI_API_KEY.")
+def analyze_with_gemini(image_bytes: bytes, mime_type: str, api_key: str = None) -> dict:
+    """Perform visual receipt fraud analysis using Google Gemini multimodal vision (gemini-2.5-flash)."""
+    key = get_gemini_key(api_key)
+    if not key:
+        raise ValueError("Google Gemini API Key is missing. Set GEMINI_API_KEY in .env or provide via UI.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
+    models_to_try = ["gemini-2.5-flash", "gemini-flash-latest"]
+    last_error = None
+
     base64_img = encode_image_base64(image_bytes)
-
     payload = {
         "contents": [
             {
@@ -117,134 +149,99 @@ def analyze_with_gemini(image_bytes: bytes, mime_type: str, api_key: str) -> dic
             "temperature": 0.1,
         },
     }
-
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers, timeout=30)
 
-    if response.status_code != 200:
-        error_msg = response.text
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
         try:
-            err_json = response.json()
-            error_msg = err_json.get("error", {}).get("message", response.text)
-        except Exception:
-            pass
-        raise RuntimeError(f"Gemini API Error ({response.status_code}): {error_msg}")
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+                    result = clean_json_response(text_content)
+                    result["engine_used"] = f"Google Gemini ({model_name})"
+                    return result
+            else:
+                last_error = response.text
+        except Exception as e:
+            last_error = str(e)
 
-    data = response.json()
-    candidates = data.get("candidates", [])
-    if not candidates:
-        raise RuntimeError("Gemini returned empty response.")
-
-    text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
-    result = clean_json_response(text_content)
-    result["engine_used"] = "Google Gemini 1.5 Flash Vision"
-    return result
+    raise RuntimeError(f"Gemini API Error: {last_error}")
 
 
-def analyze_with_groq(image_bytes: bytes, mime_type: str, api_key: str) -> dict:
-    """Perform visual receipt fraud analysis using Groq Vision API."""
-    api_key = api_key or os.environ.get("GROQ_API_KEY", "")
-    if not api_key:
-        raise ValueError("Groq API Key is missing. Please provide a key or set GROQ_API_KEY.")
+def analyze_with_groq_reasoning(gemini_data: dict, api_key: str = None) -> dict:
+    """Use Groq API (openai/gpt-oss-20b) to cross-verify forensic findings and calculate fraud risk."""
+    key = get_groq_key(api_key)
+    if not key:
+        return gemini_data
 
     from groq import Groq
 
-    client = Groq(api_key=api_key)
-    base64_img = encode_image_base64(image_bytes)
-    data_url = f"data:{mime_type};base64,{base64_img}"
+    client = Groq(api_key=key)
+    prompt = f"""
+You are a senior financial fraud analyst. Cross-examine the following initial visual forensic report extracted from a payment receipt screenshot:
 
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": SYSTEM_INSTRUCTION + "\nReturn ONLY valid JSON."},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": data_url},
-                    },
-                ],
-            }
-        ],
-        model="llama-3.2-11b-vision-preview",
-        response_format={"type": "json_object"},
-        temperature=0.1,
-    )
+{json.dumps(gemini_data, indent=2)}
 
-    text_content = chat_completion.choices[0].message.content
-    result = clean_json_response(text_content)
-    result["engine_used"] = "Groq Vision (Llama-3.2-11B)"
-    return result
-
-
-def analyze_with_dual_consensus(image_bytes: bytes, mime_type: str, gemini_key: str, groq_key: str) -> dict:
-    """Run both Gemini and Groq models and compute an ensemble consensus."""
-    gemini_result = None
-    groq_result = None
-    errors = []
-
+Task:
+1. Verify if the extracted reference number / UTR format, amount, and spoof hallmarks indicate an authentic transaction or an offline spoof APK / Photoshop scam.
+2. Provide a second-opinion risk score (0-100) and identify any additional banking fraud vectors.
+3. Return ONLY a valid JSON object matching this schema:
+{{
+  "groq_risk_score": <int 0-100>,
+  "groq_verdict": "SCAM" | "LEGITIMATE" | "SUSPICIOUS",
+  "groq_analysis": "<2 sentence fraud validation>",
+  "additional_red_flags": ["<extra flags if any>"]
+}}
+"""
     try:
-        gemini_result = analyze_with_gemini(image_bytes, mime_type, gemini_key)
-    except Exception as e:
-        errors.append(f"Gemini: {str(e)}")
+        chat = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+        groq_resp = json.loads(chat.choices[0].message.content)
+        return groq_resp
+    except Exception:
+        return {}
 
-    try:
-        groq_result = analyze_with_groq(image_bytes, mime_type, groq_key)
-    except Exception as e:
-        errors.append(f"Groq: {str(e)}")
 
-    if not gemini_result and not groq_result:
-        raise RuntimeError("Both Gemini and Groq analyses failed: " + " | ".join(errors))
+def analyze_with_dual_consensus(image_bytes: bytes, mime_type: str, gemini_key: str = None, groq_key: str = None) -> dict:
+    """Ensemble verification: Gemini Vision extracts visual forensics, Groq cross-validates payment protocols."""
+    gkey = get_gemini_key(gemini_key)
+    qkey = get_groq_key(groq_key)
 
-    if gemini_result and not groq_result:
-        gemini_result["engine_used"] += " (Groq failed, fallback to Gemini)"
-        return gemini_result
+    # 1. Run Gemini Vision
+    gemini_result = analyze_with_gemini(image_bytes, mime_type, gkey)
 
-    if groq_result and not gemini_result:
-        groq_result["engine_used"] += " (Gemini failed, fallback to Groq)"
-        return groq_result
+    # 2. Run Groq Cross-Validation
+    groq_result = analyze_with_groq_reasoning(gemini_result, qkey)
 
-    # Compute consensus
-    avg_risk = round((gemini_result["risk_score"] + groq_result["risk_score"]) / 2)
-    avg_conf = round((gemini_result["confidence"] + groq_result["confidence"]) / 2)
+    if groq_result:
+        groq_risk = groq_result.get("groq_risk_score", gemini_result["risk_score"])
+        combined_risk = round((gemini_result["risk_score"] * 0.6) + (groq_risk * 0.4))
+        
+        # Combine flags
+        combined_flags = list(dict.fromkeys(gemini_result.get("red_flags", []) + groq_result.get("additional_red_flags", [])))
+        
+        verdict = "SCAM" if combined_risk >= 70 else ("SUSPICIOUS" if combined_risk >= 40 else "LEGITIMATE")
 
-    is_scam = avg_risk >= 50
-    verdict = "SCAM" if avg_risk >= 70 else ("SUSPICIOUS" if avg_risk >= 40 else "LEGITIMATE")
+        gemini_result["verdict"] = verdict
+        gemini_result["is_scam"] = combined_risk >= 50
+        gemini_result["risk_score"] = combined_risk
+        gemini_result["engine_used"] = "Dual AI Consensus (Gemini 2.5 Flash Vision + Groq GPT-OSS)"
+        gemini_result["red_flags"] = combined_flags
+        if groq_result.get("groq_analysis"):
+            gemini_result["summary"] += f" | Groq Cross-Verification: {groq_result['groq_analysis']}"
 
-    # Combine unique red flags
-    all_red_flags = list(dict.fromkeys(gemini_result.get("red_flags", []) + groq_result.get("red_flags", [])))
-
-    consensus = {
-        "verdict": verdict,
-        "is_scam": is_scam,
-        "risk_score": avg_risk,
-        "confidence": avg_conf,
-        "summary": f"Consensus evaluation from both Gemini and Groq models: {gemini_result.get('summary', '')}",
-        "engine_used": "Dual AI Consensus (Gemini 1.5 Flash + Groq Llama 3.2)",
-        "extracted_details": gemini_result.get("extracted_details") or groq_result.get("extracted_details", {}),
-        "forensic_checks": gemini_result.get("forensic_checks", []),
-        "red_flags": all_red_flags,
-        "recommendation": gemini_result.get("recommendation", "Always check your official banking app directly."),
-        "model_agreement": {
-            "gemini_risk": gemini_result["risk_score"],
-            "groq_risk": groq_result["risk_score"],
-            "agreement_delta": abs(gemini_result["risk_score"] - groq_result["risk_score"]),
-        },
-    }
-    return consensus
+    return gemini_result
 
 
 def analyze_with_heuristic_demo(image_bytes: bytes, filename: str) -> dict:
-    """
-    Fallback intelligent forensic demo analyzer for testing when external API keys are not provided.
-    Inspects image resolution, colors, and patterns.
-    """
-    try:
-        img = Image.open(io.BytesIO(image_bytes))
-        width, height = img.size
-    except Exception:
-        width, height = (400, 650)
-
+    """Fallback intelligent forensic demo analyzer for offline testing."""
     fname = (filename or "").lower()
     is_fake_sample = "fake" in fname or "spoof" in fname or "scam" in fname
 

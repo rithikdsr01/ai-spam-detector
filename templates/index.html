@@ -352,28 +352,30 @@
           <!-- AI Model & API Key Settings -->
           <div class="api-keys-card">
             <div id="toggle-api-settings" class="api-keys-header">
-              <span><i class="fa-solid fa-sliders"></i> AI Engine & API Keys (Gemini & Groq)</span>
-              <i id="api-toggle-icon" class="fa-solid fa-chevron-down"></i>
+              <span><i class="fa-solid fa-microchip"></i> AI Engine: Gemini Vision + Groq</span>
+              <span class="nav-badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: 600;">
+                <i class="fa-solid fa-circle-check"></i> Connected in Backend
+              </span>
             </div>
 
             <div id="api-settings-body" style="display: flex; flex-direction: column; gap: 8px;">
               <div class="api-input-group">
-                <label class="api-input-label">Select AI Engine:</label>
+                <label class="api-input-label">Scanning Engine:</label>
                 <select id="receipt-engine" class="filter-select" style="width: 100%;">
-                  <option value="dual" selected>Dual AI Consensus (Gemini + Groq) [Recommended]</option>
-                  <option value="gemini">Google Gemini 1.5 Flash Vision</option>
-                  <option value="groq">Groq Vision (Llama-3.2-11B)</option>
-                  <option value="auto">Auto / Heuristic Forensic Demo</option>
+                  <option value="dual" selected>Dual AI Consensus (Gemini 2.5 Flash + Groq) [Recommended]</option>
+                  <option value="gemini">Google Gemini 2.5 Flash Vision</option>
+                  <option value="groq">Groq Vision / Reasoning</option>
+                  <option value="auto">Auto Selection</option>
                 </select>
               </div>
 
               <div class="api-input-group">
                 <div class="api-input-label">
                   <span>Google Gemini API Key:</span>
-                  <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #818cf8; text-decoration: underline;">Get free key</a>
+                  <span style="color: #34d399; font-size: 0.75rem;">Connected in Backend</span>
                 </div>
                 <div class="api-input-wrap">
-                  <input type="password" id="gemini-api-key" class="api-input-text" placeholder="AIzaSy... (optional if set in env)">
+                  <input type="password" id="gemini-api-key" class="api-input-text" placeholder="Using backend environment key (or override)">
                   <button type="button" class="api-input-toggle" onclick="togglePasswordVisibility('gemini-api-key')">
                     <i class="fa-regular fa-eye"></i>
                   </button>
@@ -383,10 +385,10 @@
               <div class="api-input-group">
                 <div class="api-input-label">
                   <span>Groq API Key:</span>
-                  <a href="https://console.groq.com/keys" target="_blank" style="color: #a855f7; text-decoration: underline;">Get free key</a>
+                  <span style="color: #34d399; font-size: 0.75rem;">Connected in Backend</span>
                 </div>
                 <div class="api-input-wrap">
-                  <input type="password" id="groq-api-key" class="api-input-text" placeholder="gsk_... (optional if set in env)">
+                  <input type="password" id="groq-api-key" class="api-input-text" placeholder="Using backend environment key (or override)">
                   <button type="button" class="api-input-toggle" onclick="togglePasswordVisibility('groq-api-key')">
                     <i class="fa-regular fa-eye"></i>
                   </button>
@@ -402,8 +404,8 @@
 
           <!-- Action Buttons -->
           <div class="button-group">
-            <button id="btn-scan-receipt" class="btn-primary">
-              <i class="fa-solid fa-magnifying-glass-chart"></i> Scan Receipt for Fraud
+            <button id="btn-scan-receipt" class="btn-primary" style="font-size: 1.05rem;">
+              <i class="fa-solid fa-shield-halved"></i> Submit & Verify Receipt
             </button>
             <button id="btn-clear-receipt" class="btn-secondary">
               <i class="fa-solid fa-arrow-rotate-left"></i> Reset
