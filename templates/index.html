@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Spam Message Detector | SMS Classifier</title>
-  <meta name="description" content="Intelligent SMS Spam Detection using TF-IDF and Multinomial Naive Bayes Machine Learning.">
+  <title>AI Spam & Fraud Detector | SMS & Receipt Scam Scanner</title>
+  <meta name="description" content="AI-Powered SMS Spam Classification & Transaction Receipt Scam Detection using TF-IDF, Naive Bayes, Gemini Vision, and Groq API.">
   
   <!-- Favicon icon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
@@ -34,7 +34,13 @@
         <ul class="nav-links">
           <li>
             <button class="nav-item-btn active" data-tab="home">
-              <i class="fa-solid fa-house"></i> Home & Detector
+              <i class="fa-solid fa-house"></i> SMS Detector
+            </button>
+          </li>
+          <li>
+            <button class="nav-item-btn" data-tab="receipt">
+              <i class="fa-solid fa-receipt"></i> Receipt Scanner
+              <span class="nav-badge" style="background: rgba(236, 72, 153, 0.25); color: #f472b6;">NEW</span>
             </button>
           </li>
           <li>
@@ -70,7 +76,7 @@
 
   <main class="container">
 
-    <!-- ================= TAB 1: HOME PAGE & DETECTOR ================= -->
+    <!-- ================= TAB 1: HOME PAGE & SMS DETECTOR ================= -->
     <section id="tab-home">
       <!-- Hero Section -->
       <div class="hero-section">
@@ -285,12 +291,298 @@
       </div>
     </section>
 
-    <!-- ================= 5. ANALYSIS HISTORY COMPONENT ================= -->
+    <!-- ================= TAB 2: RECEIPT SCAM SCANNER (GEMINI & GROQ) ================= -->
+    <section id="tab-receipt" class="receipt-section">
+      <div class="hero-section" style="padding: 1.5rem 0 1rem 0;">
+        <div class="badge-tag">
+          <i class="fa-solid fa-eye"></i> Multimodal AI Vision & Fraud Detection
+        </div>
+        <h1 class="hero-title" style="font-size: 2.35rem;">
+          AI Transaction <span class="gradient-text">Receipt Scam</span> Scanner
+        </h1>
+        <p class="hero-subtitle">
+          Detect fake payment screenshots, forged transaction amounts, and fake UPI/Paytm/GPay spoof apps using Google Gemini Vision and Groq API.
+        </p>
+      </div>
+
+      <div class="detector-layout">
+        
+        <!-- Left: Upload & Config Card -->
+        <div class="glass-panel input-card">
+          <div class="card-header-flex">
+            <h2 class="card-title">
+              <i class="fa-solid fa-file-invoice-dollar gradient-text"></i> Upload Receipt
+            </h2>
+            <span class="nav-badge">Image Forensics</span>
+          </div>
+
+          <!-- Hidden File Input -->
+          <input type="file" id="receipt-file-input" accept="image/png, image/jpeg, image/jpg, image/webp" style="display: none;">
+
+          <!-- Drag and Drop Dropzone -->
+          <div id="receipt-dropzone" class="upload-zone">
+            <div class="upload-icon">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <div class="upload-main-text">Click or drag receipt screenshot here</div>
+            <div class="upload-sub-text">Supports PNG, JPG, JPEG, WEBP (Max 10MB)</div>
+          </div>
+
+          <!-- Image Preview -->
+          <div id="receipt-preview-box" class="preview-container">
+            <img id="receipt-preview-img" class="preview-image" src="" alt="Receipt Preview">
+            <button id="btn-remove-receipt" class="btn-remove-image">
+              <i class="fa-solid fa-xmark"></i> Remove
+            </button>
+          </div>
+
+          <!-- Quick Test Samples -->
+          <div class="samples-wrapper">
+            <span class="samples-label"><i class="fa-solid fa-bolt"></i> Test with Pre-Loaded Samples:</span>
+            <div class="samples-pills">
+              <button id="btn-sample-fake-receipt" class="sample-pill spam-pill">
+                🚨 Sample Fake Spoof UPI Receipt
+              </button>
+              <button id="btn-sample-real-receipt" class="sample-pill ham-pill">
+                🛡️ Sample Authentic Bank Receipt
+              </button>
+            </div>
+          </div>
+
+          <!-- AI Model & API Key Settings -->
+          <div class="api-keys-card">
+            <div id="toggle-api-settings" class="api-keys-header">
+              <span><i class="fa-solid fa-sliders"></i> AI Engine & API Keys (Gemini & Groq)</span>
+              <i id="api-toggle-icon" class="fa-solid fa-chevron-down"></i>
+            </div>
+
+            <div id="api-settings-body" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="api-input-group">
+                <label class="api-input-label">Select AI Engine:</label>
+                <select id="receipt-engine" class="filter-select" style="width: 100%;">
+                  <option value="dual" selected>Dual AI Consensus (Gemini + Groq) [Recommended]</option>
+                  <option value="gemini">Google Gemini 1.5 Flash Vision</option>
+                  <option value="groq">Groq Vision (Llama-3.2-11B)</option>
+                  <option value="auto">Auto / Heuristic Forensic Demo</option>
+                </select>
+              </div>
+
+              <div class="api-input-group">
+                <div class="api-input-label">
+                  <span>Google Gemini API Key:</span>
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #818cf8; text-decoration: underline;">Get free key</a>
+                </div>
+                <div class="api-input-wrap">
+                  <input type="password" id="gemini-api-key" class="api-input-text" placeholder="AIzaSy... (optional if set in env)">
+                  <button type="button" class="api-input-toggle" onclick="togglePasswordVisibility('gemini-api-key')">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="api-input-group">
+                <div class="api-input-label">
+                  <span>Groq API Key:</span>
+                  <a href="https://console.groq.com/keys" target="_blank" style="color: #a855f7; text-decoration: underline;">Get free key</a>
+                </div>
+                <div class="api-input-wrap">
+                  <input type="password" id="groq-api-key" class="api-input-text" placeholder="gsk_... (optional if set in env)">
+                  <button type="button" class="api-input-toggle" onclick="togglePasswordVisibility('groq-api-key')">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
+                <input type="checkbox" id="remember-api-keys" checked>
+                <label for="remember-api-keys">Remember API keys in this browser</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="button-group">
+            <button id="btn-scan-receipt" class="btn-primary">
+              <i class="fa-solid fa-magnifying-glass-chart"></i> Scan Receipt for Fraud
+            </button>
+            <button id="btn-clear-receipt" class="btn-secondary">
+              <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Forensic Results Card -->
+        <div class="glass-panel results-card">
+          
+          <!-- Empty State -->
+          <div id="receipt-results-empty" class="results-empty-state">
+            <div class="empty-icon">
+              <i class="fa-solid fa-shield-virus"></i>
+            </div>
+            <h3>Receipt Forensic Engine Ready</h3>
+            <p style="font-size: 0.9rem; margin-top: 6px;">
+              Upload any receipt image or click one of the pre-loaded test samples to perform deep forensic verification with Gemini & Groq.
+            </p>
+          </div>
+
+          <!-- Active Forensic Results -->
+          <div id="receipt-results-content" style="display: none;">
+            
+            <!-- Dynamic Verdict Banner -->
+            <div id="receipt-verdict-banner" class="prediction-badge-box is-spam">
+              <h3 id="receipt-verdict-title" class="result-verdict-title">
+                <i class="fa-solid fa-triangle-exclamation"></i> FAKE / SCAM DETECTED
+              </h3>
+              <p id="receipt-verdict-subtitle" class="result-verdict-subtitle">
+                High Risk Scam Signature Identified
+              </p>
+            </div>
+
+            <!-- Risk Score Gauge -->
+            <div class="risk-meter-box">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600;">
+                <span id="receipt-risk-label">Overall Fraud Risk Score</span>
+                <span id="receipt-risk-score" style="color: #f87171; font-size: 1rem;">94 / 100</span>
+              </div>
+              <div class="risk-bar-track">
+                <div id="receipt-risk-fill" class="risk-bar-fill fill-spam" style="width: 94%;"></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
+                <span id="receipt-engine-badge">Engine: Dual AI Consensus</span>
+                <span id="receipt-confidence-val">Confidence: 96%</span>
+              </div>
+            </div>
+
+            <!-- Extracted Transaction Details Grid -->
+            <div class="section-mini-title">
+              <i class="fa-solid fa-list-check"></i> Extracted Transaction Records:
+            </div>
+            <div class="meta-grid" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 1rem; text-align: left; padding: 10px 14px;">
+              <div>
+                <div class="meta-item-label">App / Payment Channel</div>
+                <div id="ext-app" class="meta-item-val" style="font-size: 0.9rem;">--</div>
+              </div>
+              <div>
+                <div class="meta-item-label">Transaction Amount</div>
+                <div id="ext-amount" class="meta-item-val" style="font-size: 0.95rem; color: #fbbf24;">--</div>
+              </div>
+              <div style="margin-top: 6px;">
+                <div class="meta-item-label">Payee (Receiver)</div>
+                <div id="ext-payee" class="meta-item-val" style="font-size: 0.85rem;">--</div>
+              </div>
+              <div style="margin-top: 6px;">
+                <div class="meta-item-label">UTR / Reference ID</div>
+                <div id="ext-utr" class="meta-item-val" style="font-size: 0.85rem; font-family: monospace;">--</div>
+              </div>
+            </div>
+
+            <!-- Forensic Check Table -->
+            <div class="section-mini-title">
+              <i class="fa-solid fa-microscope"></i> Forensic Verification Matrix:
+            </div>
+            <table class="forensic-table">
+              <thead>
+                <tr>
+                  <th>Check Type</th>
+                  <th style="width: 85px;">Status</th>
+                  <th>Findings</th>
+                </tr>
+              </thead>
+              <tbody id="receipt-forensic-tbody">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+
+            <!-- Red Flags List -->
+            <div id="receipt-red-flags-card" class="red-flags-box" style="display: none;">
+              <strong style="color: #f87171; font-size: 0.85rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i> Identified Red Flags:
+              </strong>
+              <ul id="receipt-red-flags-list" class="red-flags-list"></ul>
+            </div>
+
+            <!-- Recommendation Box -->
+            <div class="advice-box">
+              <strong style="display: block; margin-bottom: 2px;">
+                <i class="fa-solid fa-shield-halved"></i> Security Recommendation:
+              </strong>
+              <span id="receipt-recommendation-text"></span>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Receipt Scans History Table -->
+      <div style="margin-top: 2rem;">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title" style="font-size: 1.4rem;">
+              <i class="fa-solid fa-clock-rotate-left gradient-text"></i> Recent Receipt Scans
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">
+              Audit history of verified payment screenshots.
+            </p>
+          </div>
+          <button class="btn-action-small" onclick="fetchReceiptHistory()">
+            <i class="fa-solid fa-rotate-right"></i> Refresh
+          </button>
+        </div>
+
+        <div class="glass-panel history-table-wrapper">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;">ID</th>
+                <th>File / Source</th>
+                <th style="width: 130px;">Verdict</th>
+                <th style="width: 100px;">Risk Score</th>
+                <th>Amount</th>
+                <th>App / Bank</th>
+                <th>AI Engine</th>
+                <th style="width: 70px; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="receipt-history-tbody">
+              {% for r in receipts %}
+              <tr id="receipt-row-{{ r.id }}">
+                <td style="color: var(--text-dim); font-size: 0.8rem;">#{{ r.id }}</td>
+                <td style="font-weight: 500;">{{ r.filename }}</td>
+                <td>
+                  {% if r.is_scam %}
+                    <span class="badge-status spam"><i class="fa-solid fa-triangle-exclamation"></i> Fake / Scam</span>
+                  {% else %}
+                    <span class="badge-status ham"><i class="fa-solid fa-check"></i> Authentic</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong style="color: {% if r.risk_score >= 70 %}#f87171{% elif r.risk_score >= 40 %}#fbbf24{% else %}#34d399{% endif %};">
+                    {{ r.risk_score }}/100
+                  </strong>
+                </td>
+                <td style="color: #fbbf24; font-weight: 600;">{{ r.amount }}</td>
+                <td>{{ r.app_name }}</td>
+                <td style="color: var(--text-dim); font-size: 0.8rem;">{{ r.engine_used }}</td>
+                <td style="text-align: right;">
+                  <button class="delete-btn" onclick="deleteReceiptItem({{ r.id }})" title="Delete record">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: SMS ANALYSIS HISTORY COMPONENT ================= -->
     <section id="tab-history" class="history-section">
       <div class="section-header">
         <div>
           <h2 class="section-title">
-            <i class="fa-solid fa-clock-rotate-left gradient-text"></i> Analysis History
+            <i class="fa-solid fa-clock-rotate-left gradient-text"></i> SMS Analysis History
           </h2>
           <p style="color: var(--text-muted); font-size: 0.95rem;">
             Chronological log of messages classified by the AI engine, persisted in SQLite.
@@ -366,7 +658,7 @@
       </div>
     </section>
 
-    <!-- ================= 6. STATISTICS AND ANALYTICS COMPONENT ================= -->
+    <!-- ================= TAB 4: STATISTICS AND ANALYTICS COMPONENT ================= -->
     <section id="tab-analytics" class="analytics-section">
       <div class="section-header">
         <div>
@@ -427,7 +719,7 @@
       </div>
     </section>
 
-    <!-- ================= 7. ABOUT AI COMPONENT ================= -->
+    <!-- ================= TAB 5: ABOUT AI COMPONENT ================= -->
     <section id="tab-about" class="about-section">
       <div class="section-header">
         <div>
@@ -478,10 +770,26 @@
           </p>
         </div>
 
+        <!-- Vision AI: Gemini & Groq -->
+        <div class="glass-panel about-card">
+          <h3 class="about-card-title">
+            <i class="fa-solid fa-eye"></i> 3. Multimodal Vision Forensics (Gemini & Groq)
+          </h3>
+          <p>
+            For transaction receipts, image classification goes beyond text. <strong>Google Gemini Vision</strong> and <strong>Groq API</strong> inspect:
+          </p>
+          <p>
+            • <strong>Typography & Font Consistency</strong>: Detects pasted numbers or mismatched font rendering on transaction amounts.<br>
+            • <strong>Layout Alignment & Compression</strong>: Discovers localized JPEG artifacts and anti-aliasing discrepancies.<br>
+            • <strong>Banking Protocol Syntax</strong>: Verifies 12-digit Indian UPI UTRs, SWIFT, PayPal, and Stripe transaction ID structures.<br>
+            • <strong>Spoof APK Signatures</strong>: Flags templates generated by offline mock payment apps (e.g. Paytm Spoof APK).
+          </p>
+        </div>
+
         <!-- Dataset & Evaluation -->
         <div class="glass-panel about-card">
           <h3 class="about-card-title">
-            <i class="fa-solid fa-database"></i> 3. SMS Spam Collection Dataset
+            <i class="fa-solid fa-database"></i> 4. SMS Spam Collection Dataset
           </h3>
           <p>
             Trained on the canonical <strong>UCI SMS Spam Collection</strong>, consisting of <strong>5,572</strong> real SMS text messages tagged as legitimate (ham) or spam.
@@ -508,15 +816,15 @@
         <!-- Project Objectives -->
         <div class="glass-panel about-card">
           <h3 class="about-card-title">
-            <i class="fa-solid fa-bullseye"></i> 4. Project Objectives & Impact
+            <i class="fa-solid fa-bullseye"></i> 5. Project Objectives & Impact
           </h3>
           <p>
-            SMS phishing ("smishing") and fraudulent messages cause billions of dollars in annual losses worldwide. The objectives of this project are:
+            SMS smishing and fake payment receipt fraud cause billions of dollars in annual merchant losses worldwide. The objectives of this platform are:
           </p>
           <ul style="color: var(--text-muted); font-size: 0.9rem; padding-left: 1.25rem; line-height: 1.8;">
-            <li>Provide accessible, real-time protection and classification for cellular communications.</li>
-            <li>Deliver model interpretability by displaying influential trigger keywords.</li>
-            <li>Maintain historical audit trails and analytical intelligence via persistent storage.</li>
+            <li>Provide accessible, real-time protection for messages and payment receipts.</li>
+            <li>Deliver model interpretability by displaying influential trigger keywords and visual forensic checks.</li>
+            <li>Maintain historical audit trails and analytical intelligence via persistent SQLite storage.</li>
             <li>Offer zero-configuration container-friendly deployment for cloud platforms like <strong>Render</strong>.</li>
           </ul>
         </div>
@@ -524,7 +832,7 @@
       </div>
     </section>
 
-    <!-- ================= 8. RENDER DEPLOYMENT GUIDE ================= -->
+    <!-- ================= TAB 6: RENDER DEPLOYMENT GUIDE ================= -->
     <section id="tab-deploy" class="deploy-section">
       <div class="section-header">
         <div>
@@ -545,7 +853,7 @@
         <div class="code-block-display">
 git init<br>
 git add .<br>
-git commit -m "Initial commit: AI Spam Message Detector"<br>
+git commit -m "Initial commit: AI Spam Message Detector & Receipt Scanner"<br>
 git branch -M main<br>
 git remote add origin https://github.com/YOUR_USERNAME/ai-spam-detector.git<br>
 git push -u origin main
@@ -572,7 +880,8 @@ git push -u origin main
           <div style="margin-bottom: 8px;">• <strong>Region:</strong> Select closest region (e.g. Frankfurt, Oregon, Singapore)</div>
           <div style="margin-bottom: 8px;">• <strong>Branch:</strong> <span class="code-pill">main</span></div>
           <div style="margin-bottom: 8px;">• <strong>Build Command:</strong> <span class="code-pill">pip install -r requirements.txt</span></div>
-          <div>• <strong>Start Command:</strong> <span class="code-pill">gunicorn app:app</span></div>
+          <div style="margin-bottom: 8px;">• <strong>Start Command:</strong> <span class="code-pill">gunicorn app:app</span></div>
+          <div>• <strong>Environment Variables (Optional):</strong> <span class="code-pill">GEMINI_API_KEY</span> and <span class="code-pill">GROQ_API_KEY</span></div>
         </div>
       </div>
 
@@ -590,7 +899,7 @@ git push -u origin main
   <footer class="site-footer">
     <div class="container footer-content">
       <div>
-        <strong>AI Spam Message Detector</strong> — Built with Python Flask, Scikit-learn, TF-IDF & Multinomial Naive Bayes.
+        <strong>AI Spam & Fraud Detector</strong> — Built with Python Flask, Scikit-learn, TF-IDF, Naive Bayes, Gemini Vision & Groq API.
       </div>
       <div>
         <span>Ready for Render Cloud Deployment 🚀</span>

@@ -39,6 +39,26 @@ def init_db():
             )
             """
         )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS receipt_scans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT,
+                verdict TEXT NOT NULL,
+                is_scam INTEGER NOT NULL,
+                risk_score INTEGER NOT NULL,
+                confidence REAL NOT NULL,
+                engine_used TEXT NOT NULL,
+                amount TEXT,
+                app_name TEXT,
+                summary TEXT,
+                red_flags TEXT,
+                extracted_details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         conn.commit()
 
         # Check if database is empty; if so, seed sample records
@@ -46,6 +66,137 @@ def init_db():
         count = cursor.fetchone()[0]
         if count == 0:
             seed_initial_records(conn)
+
+        cursor.execute("SELECT COUNT(*) FROM receipt_scans")
+        r_count = cursor.fetchone()[0]
+        if r_count == 0:
+            seed_receipt_records(conn)
+
+
+def seed_receipt_records(conn):
+    """Seed initial sample receipt analysis records."""
+    now = datetime.now()
+    samples = [
+        (
+            "sample_fake_receipt.png",
+            "SCAM",
+            1,
+            94,
+            96.0,
+            "Dual AI Consensus (Gemini + Groq)",
+            "Rs. 15,000.00",
+            "UPI Spoof App v2",
+            "High-probability synthetic receipt manipulation. Typographical inconsistency on transaction amount and non-standard 6-digit reference number.",
+            json.dumps(["Invalid 6-digit transaction ID instead of 12-digit UPI UTR", "Mismatched typography on currency value", "Signature matches offline payment simulator APK"]),
+            json.dumps({"app_or_bank": "UPI Spoof App", "amount": "Rs. 15,000.00", "payee": "Alex Electronics", "transaction_id": "998822"}),
+            (now - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+        (
+            "sample_real_receipt.png",
+            "LEGITIMATE",
+            0,
+            8,
+            92.0,
+            "Google Gemini 1.5 Flash Vision",
+            "Rs. 1,420.00",
+            "Google Pay / Verified UPI",
+            "Receipt appears authentic with consistent typography, genuine vector icons, authentic 12-digit UTR bank reference number, and proper layout hierarchy.",
+            json.dumps([]),
+            json.dumps({"app_or_bank": "Google Pay", "amount": "Rs. 1,420.00", "payee": "Fresh Supermarket", "transaction_id": "429810452391"}),
+            (now - timedelta(minutes=45)).strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+    ]
+
+    cursor = conn.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO receipt_scans (
+            filename, verdict, is_scam, risk_score, confidence,
+            engine_used, amount, app_name, summary, red_flags,
+            extracted_details, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        samples,
+    )
+    conn.commit()
+
+
+def save_receipt_scan(filename: str, result: dict):
+    """Save receipt scan result to database."""
+    details = result.get("extracted_details", {})
+    amount = details.get("amount", "Unknown")
+    app_name = details.get("app_or_bank", "Unknown")
+    is_scam_int = 1 if result.get("is_scam", False) else 0
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO receipt_scans (
+                filename, verdict, is_scam, risk_score, confidence,
+                engine_used, amount, app_name, summary, red_flags, extracted_details
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                filename,
+                result.get("verdict", "UNKNOWN"),
+                is_scam_int,
+                result.get("risk_score", 0),
+                result.get("confidence", 0.0),
+                result.get("engine_used", "Unknown"),
+                amount,
+                app_name,
+                result.get("summary", ""),
+                json.dumps(result.get("red_flags", [])),
+                json.dumps(details),
+            ),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_receipt_scans(limit: int = 50):
+    """Retrieve receipt analysis history records."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM receipt_scans
+            ORDER BY id DESC LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = cursor.fetchall()
+
+    results = []
+    for r in rows:
+        results.append(
+            {
+                "id": r["id"],
+                "filename": r["filename"],
+                "verdict": r["verdict"],
+                "is_scam": bool(r["is_scam"]),
+                "risk_score": r["risk_score"],
+                "confidence": r["confidence"],
+                "engine_used": r["engine_used"],
+                "amount": r["amount"],
+                "app_name": r["app_name"],
+                "summary": r["summary"],
+                "red_flags": json.loads(r["red_flags"]) if r["red_flags"] else [],
+                "extracted_details": json.loads(r["extracted_details"]) if r["extracted_details"] else {},
+                "created_at": r["created_at"],
+            }
+        )
+    return results
+
+
+def delete_receipt_scan(scan_id: int):
+    """Delete a single receipt scan record."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM receipt_scans WHERE id = ?", (scan_id,))
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 def seed_initial_records(conn):

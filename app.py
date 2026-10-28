@@ -9,6 +9,7 @@ import numpy as np
 from flask import Flask, render_template, request, jsonify
 
 import database
+import receipt_scanner
 from model_trainer import load_model_and_vectorizer, clean_text
 
 app = Flask(__name__)
@@ -109,10 +110,12 @@ def index():
     """Main Home page dashboard."""
     stats = database.get_analytics_summary()
     recent_history = database.get_history(limit=10)
+    recent_receipts = database.get_receipt_scans(limit=10)
     return render_template(
         "index.html",
         stats=stats,
         history=recent_history,
+        receipts=recent_receipts,
         metrics=model_metrics,
     )
 
@@ -145,6 +148,93 @@ def predict_endpoint():
     result["message"] = message
 
     return jsonify(result)
+
+
+@app.route("/api/scan-receipt", methods=["POST"])
+def scan_receipt_endpoint():
+    """API endpoint to scan transaction receipt screenshot for fraud and spoofing."""
+    file = request.files.get("image")
+    sample_type = request.form.get("sample_type", "").strip().lower()
+    engine = request.form.get("engine", "auto").strip().lower()
+    gemini_key = request.form.get("gemini_api_key", "").strip() or os.environ.get("GEMINI_API_KEY", "")
+    groq_key = request.form.get("groq_api_key", "").strip() or os.environ.get("GROQ_API_KEY", "")
+
+    filename = "uploaded_receipt.png"
+    mime_type = "image/png"
+    image_bytes = None
+
+    if sample_type in ["fake", "real"]:
+        sample_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "static",
+            "images",
+            f"sample_{sample_type}_receipt.png",
+        )
+        if os.path.exists(sample_path):
+            with open(sample_path, "rb") as f:
+                image_bytes = f.read()
+            filename = f"sample_{sample_type}_receipt.png"
+        else:
+            return jsonify({"error": f"Sample image {sample_type} not found on server."}), 404
+    elif file and file.filename:
+        filename = file.filename
+        mime_type = file.mimetype or "image/png"
+        image_bytes = file.read()
+    else:
+        return jsonify({"error": "No receipt image provided. Please upload a screenshot or select a sample."}), 400
+
+    if not image_bytes or len(image_bytes) == 0:
+        return jsonify({"error": "Uploaded image file is empty."}), 400
+
+    if len(image_bytes) > 10 * 1024 * 1024:
+        return jsonify({"error": "File size exceeds 10MB limit."}), 400
+
+    # Determine scanning engine and execute
+    try:
+        if engine == "dual" and gemini_key and groq_key:
+            result = receipt_scanner.analyze_with_dual_consensus(image_bytes, mime_type, gemini_key, groq_key)
+        elif engine == "gemini" and gemini_key:
+            result = receipt_scanner.analyze_with_gemini(image_bytes, mime_type, gemini_key)
+        elif engine == "groq" and groq_key:
+            result = receipt_scanner.analyze_with_groq(image_bytes, mime_type, groq_key)
+        elif engine == "auto":
+            if gemini_key and groq_key:
+                result = receipt_scanner.analyze_with_dual_consensus(image_bytes, mime_type, gemini_key, groq_key)
+            elif gemini_key:
+                result = receipt_scanner.analyze_with_gemini(image_bytes, mime_type, gemini_key)
+            elif groq_key:
+                result = receipt_scanner.analyze_with_groq(image_bytes, mime_type, groq_key)
+            else:
+                result = receipt_scanner.analyze_with_heuristic_demo(image_bytes, filename)
+        else:
+            # Fallback to intelligent heuristic demo
+            result = receipt_scanner.analyze_with_heuristic_demo(image_bytes, filename)
+
+        # Save to database
+        scan_id = database.save_receipt_scan(filename, result)
+        result["id"] = scan_id
+        result["filename"] = filename
+        return jsonify(result)
+
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/receipt-history", methods=["GET"])
+def receipt_history_endpoint():
+    """Retrieve historical receipt scans."""
+    limit = int(request.args.get("limit", 50))
+    scans = database.get_receipt_scans(limit=limit)
+    return jsonify(scans)
+
+
+@app.route("/api/receipt-history/<int:scan_id>", methods=["DELETE"])
+def delete_receipt_history_item(scan_id):
+    """Delete a receipt scan entry."""
+    success = database.delete_receipt_scan(scan_id)
+    if success:
+        return jsonify({"success": True, "message": f"Receipt record #{scan_id} deleted."})
+    return jsonify({"error": "Record not found."}), 404
 
 
 @app.route("/api/history", methods=["GET"])

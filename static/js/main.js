@@ -1,6 +1,6 @@
 /**
- * Client-Side JavaScript for AI Spam Message Detector
- * Handles AJAX requests, UI updates, Chart.js visualizations, and interactions.
+ * Client-Side JavaScript for AI Spam Message Detector & Receipt Scam Scanner
+ * Handles AJAX requests, UI updates, Chart.js visualizations, image uploads, and interactions.
  */
 
 // Global Chart references for updating
@@ -11,6 +11,10 @@ let charts = {
   keywords: null,
 };
 
+// Selected receipt file or sample
+let activeReceiptFile = null;
+let activeSampleType = null;
+
 // DOM ready
 document.addEventListener("DOMContentLoaded", () => {
   initTabs();
@@ -19,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAnalyzeForm();
   initHistoryControls();
   initCharts();
+  initReceiptScanner();
 });
 
 /**
@@ -28,6 +33,7 @@ function initTabs() {
   const tabButtons = document.querySelectorAll(".nav-item-btn");
   const tabSections = {
     home: document.getElementById("tab-home"),
+    receipt: document.getElementById("tab-receipt"),
     history: document.getElementById("tab-history"),
     analytics: document.getElementById("tab-analytics"),
     about: document.getElementById("tab-about"),
@@ -55,6 +61,8 @@ function initTabs() {
         fetchHistory();
       } else if (targetTab === "analytics") {
         fetchAnalyticsAndUpdateCharts();
+      } else if (targetTab === "receipt") {
+        fetchReceiptHistory();
       }
     });
   });
@@ -102,7 +110,7 @@ function initTextareaCounters() {
 }
 
 /**
- * Quick Sample Buttons
+ * Quick Sample Buttons for SMS
  */
 const SAMPLE_MESSAGES = {
   spam1: "WINNER! As a valued network customer you have been selected to receive a £900 prize reward! To claim call 09061701461. Claim code KL341. Valid 12 hours only.",
@@ -114,7 +122,7 @@ const SAMPLE_MESSAGES = {
 };
 
 function initSamplePills() {
-  document.querySelectorAll(".sample-pill").forEach((pill) => {
+  document.querySelectorAll(".sample-pill[data-sample]").forEach((pill) => {
     pill.addEventListener("click", () => {
       const sampleKey = pill.getAttribute("data-sample");
       const textarea = document.getElementById("message-input");
@@ -475,10 +483,8 @@ async function exportHistoryToCSV() {
  * Analytics Charts (Chart.js)
  */
 async function initCharts() {
-  // Check if Chart.js is loaded
   if (typeof Chart === "undefined") return;
 
-  // Chart defaults for dark theme
   Chart.defaults.color = "#9ca3af";
   Chart.defaults.borderColor = "rgba(255, 255, 255, 0.08)";
   Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -640,6 +646,406 @@ async function fetchAnalyticsAndUpdateCharts() {
     console.error("Error updating charts", err);
   }
 }
+
+/**
+ * ================= RECEIPT SCAM SCANNER CLIENT LOGIC =================
+ */
+function initReceiptScanner() {
+  const dropzone = document.getElementById("receipt-dropzone");
+  const fileInput = document.getElementById("receipt-file-input");
+  const previewBox = document.getElementById("receipt-preview-box");
+  const previewImg = document.getElementById("receipt-preview-img");
+  const removeBtn = document.getElementById("btn-remove-receipt");
+  const scanBtn = document.getElementById("btn-scan-receipt");
+  const clearBtn = document.getElementById("btn-clear-receipt");
+
+  const sampleFakeBtn = document.getElementById("btn-sample-fake-receipt");
+  const sampleRealBtn = document.getElementById("btn-sample-real-receipt");
+
+  const geminiInput = document.getElementById("gemini-api-key");
+  const groqInput = document.getElementById("groq-api-key");
+  const rememberCheckbox = document.getElementById("remember-api-keys");
+
+  // Load saved API keys from localStorage
+  if (geminiInput && localStorage.getItem("saved_gemini_key")) {
+    geminiInput.value = localStorage.getItem("saved_gemini_key");
+  }
+  if (groqInput && localStorage.getItem("saved_groq_key")) {
+    groqInput.value = localStorage.getItem("saved_groq_key");
+  }
+
+  // Save API keys when modified
+  const saveKeysToStorage = () => {
+    if (rememberCheckbox && rememberCheckbox.checked) {
+      if (geminiInput) localStorage.setItem("saved_gemini_key", geminiInput.value.trim());
+      if (groqInput) localStorage.setItem("saved_groq_key", groqInput.value.trim());
+    } else {
+      localStorage.removeItem("saved_gemini_key");
+      localStorage.removeItem("saved_groq_key");
+    }
+  };
+  if (geminiInput) geminiInput.addEventListener("input", saveKeysToStorage);
+  if (groqInput) groqInput.addEventListener("input", saveKeysToStorage);
+
+  // Toggle API settings accordion
+  const toggleBtn = document.getElementById("toggle-api-settings");
+  const settingsBody = document.getElementById("api-settings-body");
+  const toggleIcon = document.getElementById("api-toggle-icon");
+  if (toggleBtn && settingsBody) {
+    toggleBtn.addEventListener("click", () => {
+      const isHidden = settingsBody.style.display === "none";
+      settingsBody.style.display = isHidden ? "flex" : "none";
+      if (toggleIcon) toggleIcon.className = isHidden ? "fa-solid fa-chevron-up" : "fa-solid fa-chevron-down";
+    });
+  }
+
+  // Dropzone click -> file dialog
+  if (dropzone && fileInput) {
+    dropzone.addEventListener("click", () => fileInput.click());
+
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleReceiptFileSelected(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleReceiptFileSelected(e.target.files[0]);
+      }
+    });
+  }
+
+  function handleReceiptFileSelected(file) {
+    if (!file.type.startsWith("image/")) {
+      showToast("Please select a valid image file (PNG, JPG, WEBP).", "danger");
+      return;
+    }
+
+    activeReceiptFile = file;
+    activeSampleType = null;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (previewImg && previewBox && dropzone) {
+        previewImg.src = e.target.result;
+        previewBox.style.display = "block";
+        dropzone.style.display = "none";
+      }
+    };
+    reader.readAsDataURL(file);
+    showToast(`Loaded "${file.name}"`, "info");
+  }
+
+  // Remove image
+  if (removeBtn) {
+    removeBtn.addEventListener("click", () => {
+      resetReceiptInput();
+      showToast("Receipt removed", "info");
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      resetReceiptInput();
+      resetReceiptResults();
+      showToast("Receipt scanner reset", "info");
+    });
+  }
+
+  function resetReceiptInput() {
+    activeReceiptFile = null;
+    activeSampleType = null;
+    if (fileInput) fileInput.value = "";
+    if (previewBox) previewBox.style.display = "none";
+    if (previewImg) previewImg.src = "";
+    if (dropzone) dropzone.style.display = "block";
+  }
+
+  function resetReceiptResults() {
+    const emptyState = document.getElementById("receipt-results-empty");
+    const contentState = document.getElementById("receipt-results-content");
+    if (emptyState) emptyState.style.display = "block";
+    if (contentState) contentState.style.display = "none";
+  }
+
+  // Pre-loaded sample buttons
+  if (sampleFakeBtn) {
+    sampleFakeBtn.addEventListener("click", () => {
+      activeReceiptFile = null;
+      activeSampleType = "fake";
+      if (previewImg && previewBox && dropzone) {
+        previewImg.src = "/static/images/sample_fake_receipt.png";
+        previewBox.style.display = "block";
+        dropzone.style.display = "none";
+      }
+      showToast("Loaded Sample Fake Receipt. Click 'Scan Receipt' to test!", "info");
+    });
+  }
+
+  if (sampleRealBtn) {
+    sampleRealBtn.addEventListener("click", () => {
+      activeReceiptFile = null;
+      activeSampleType = "real";
+      if (previewImg && previewBox && dropzone) {
+        previewImg.src = "/static/images/sample_real_receipt.png";
+        previewBox.style.display = "block";
+        dropzone.style.display = "none";
+      }
+      showToast("Loaded Sample Authentic Receipt. Click 'Scan Receipt' to test!", "info");
+    });
+  }
+
+  // Scan Action
+  if (scanBtn) {
+    scanBtn.addEventListener("click", async () => {
+      if (!activeReceiptFile && !activeSampleType) {
+        showToast("Please upload a receipt screenshot or select a test sample first.", "danger");
+        return;
+      }
+
+      const engineSelect = document.getElementById("receipt-engine");
+      const engine = engineSelect ? engineSelect.value : "dual";
+      const geminiKey = geminiInput ? geminiInput.value.trim() : "";
+      const groqKey = groqInput ? groqInput.value.trim() : "";
+
+      scanBtn.disabled = true;
+      const originalBtnHTML = scanBtn.innerHTML;
+      scanBtn.innerHTML = `<span class="spinner"></span> Inspecting with AI Vision...`;
+
+      const formData = new FormData();
+      if (activeReceiptFile) {
+        formData.append("image", activeReceiptFile);
+      } else if (activeSampleType) {
+        formData.append("sample_type", activeSampleType);
+      }
+
+      formData.append("engine", engine);
+      if (geminiKey) formData.append("gemini_api_key", geminiKey);
+      if (groqKey) formData.append("groq_api_key", groqKey);
+
+      try {
+        const response = await fetch("/api/scan-receipt", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Receipt scan failed.");
+        }
+
+        renderReceiptResult(data);
+        showToast(`Scan complete: ${data.verdict} (Risk: ${data.risk_score}/100)`, data.is_scam ? "danger" : "success");
+        fetchReceiptHistory();
+      } catch (err) {
+        showToast(err.message || "Error analyzing receipt", "danger");
+      } finally {
+        scanBtn.disabled = false;
+        scanBtn.innerHTML = originalBtnHTML;
+      }
+    });
+  }
+}
+
+/**
+ * Display Receipt Forensic Result
+ */
+function renderReceiptResult(data) {
+  const emptyState = document.getElementById("receipt-results-empty");
+  const contentState = document.getElementById("receipt-results-content");
+
+  if (emptyState) emptyState.style.display = "none";
+  if (contentState) contentState.style.display = "block";
+
+  // Verdict Banner
+  const banner = document.getElementById("receipt-verdict-banner");
+  const title = document.getElementById("receipt-verdict-title");
+  const subtitle = document.getElementById("receipt-verdict-subtitle");
+
+  if (data.verdict === "SCAM") {
+    banner.className = "prediction-badge-box is-spam";
+    title.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> FAKE / SCAM RECEIPT`;
+    subtitle.textContent = data.summary || "High probability synthetic fraud signature detected.";
+  } else if (data.verdict === "SUSPICIOUS") {
+    banner.className = "prediction-badge-box";
+    banner.style.background = "rgba(245, 158, 11, 0.15)";
+    banner.style.border = "2px solid rgba(245, 158, 11, 0.4)";
+    title.style.color = "#fbbf24";
+    title.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> SUSPICIOUS RECEIPT`;
+    subtitle.textContent = data.summary || "Inconclusive cues. Review details carefully.";
+  } else {
+    banner.className = "prediction-badge-box is-ham";
+    title.innerHTML = `<i class="fa-solid fa-shield-halved"></i> AUTHENTIC RECEIPT`;
+    subtitle.textContent = data.summary || "Receipt matches legitimate bank confirmation patterns.";
+  }
+
+  // Risk Score
+  const riskScore = document.getElementById("receipt-risk-score");
+  const riskFill = document.getElementById("receipt-risk-fill");
+  const engineBadge = document.getElementById("receipt-engine-badge");
+  const confVal = document.getElementById("receipt-confidence-val");
+
+  if (riskScore) riskScore.textContent = `${data.risk_score} / 100`;
+  if (riskFill) {
+    riskFill.style.width = `${data.risk_score}%`;
+    if (data.risk_score >= 70) {
+      riskFill.className = "risk-bar-fill fill-spam";
+    } else if (data.risk_score >= 40) {
+      riskFill.className = "risk-bar-fill";
+      riskFill.style.background = "#fbbf24";
+    } else {
+      riskFill.className = "risk-bar-fill fill-ham";
+    }
+  }
+
+  if (engineBadge) engineBadge.textContent = `Engine: ${data.engine_used || "AI Vision"}`;
+  if (confVal) confVal.textContent = `Confidence: ${data.confidence || 90}%`;
+
+  // Extracted Details
+  const details = data.extracted_details || {};
+  const extApp = document.getElementById("ext-app");
+  const extAmount = document.getElementById("ext-amount");
+  const extPayee = document.getElementById("ext-payee");
+  const extUtr = document.getElementById("ext-utr");
+
+  if (extApp) extApp.textContent = details.app_or_bank || "Unknown";
+  if (extAmount) extAmount.textContent = details.amount || "N/A";
+  if (extPayee) extPayee.textContent = details.payee || "N/A";
+  if (extUtr) extUtr.textContent = details.transaction_id || "N/A";
+
+  // Forensic Checks Table
+  const tbody = document.getElementById("receipt-forensic-tbody");
+  if (tbody) {
+    tbody.innerHTML = "";
+    if (data.forensic_checks && data.forensic_checks.length > 0) {
+      data.forensic_checks.forEach((chk) => {
+        const tr = document.createElement("tr");
+        const statusClass = (chk.status || "").toLowerCase();
+        let icon = "fa-check";
+        if (statusClass === "fail") icon = "fa-xmark";
+        if (statusClass === "warning") icon = "fa-triangle-exclamation";
+
+        tr.innerHTML = `
+          <td style="font-weight: 500;">${escapeHtml(chk.check)}</td>
+          <td>
+            <span class="forensic-badge ${statusClass}">
+              <i class="fa-solid ${icon}"></i> ${escapeHtml(chk.status)}
+            </span>
+          </td>
+          <td style="color: var(--text-muted);">${escapeHtml(chk.details)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+  }
+
+  // Red Flags
+  const flagsCard = document.getElementById("receipt-red-flags-card");
+  const flagsList = document.getElementById("receipt-red-flags-list");
+  if (flagsCard && flagsList) {
+    if (data.red_flags && data.red_flags.length > 0) {
+      flagsCard.style.display = "block";
+      flagsList.innerHTML = data.red_flags.map((rf) => `<li>${escapeHtml(rf)}</li>`).join("");
+    } else {
+      flagsCard.style.display = "none";
+      flagsList.innerHTML = "";
+    }
+  }
+
+  // Recommendation
+  const recText = document.getElementById("receipt-recommendation-text");
+  if (recText) {
+    recText.textContent = data.recommendation || "Verify transaction directly in your banking app before delivering goods or services.";
+  }
+}
+
+/**
+ * Fetch and render receipt history
+ */
+async function fetchReceiptHistory() {
+  const tbody = document.getElementById("receipt-history-tbody");
+  if (!tbody) return;
+
+  try {
+    const res = await fetch("/api/receipt-history");
+    const records = await res.json();
+
+    tbody.innerHTML = "";
+    if (records.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-dim);">
+            No receipt scans recorded yet.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    records.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.id = `receipt-row-${r.id}`;
+
+      const isScam = r.is_scam;
+      const statusBadge = isScam
+        ? `<span class="badge-status spam"><i class="fa-solid fa-triangle-exclamation"></i> Fake / Scam</span>`
+        : `<span class="badge-status ham"><i class="fa-solid fa-check"></i> Authentic</span>`;
+
+      const riskColor = r.risk_score >= 70 ? "#f87171" : r.risk_score >= 40 ? "#fbbf24" : "#34d399";
+
+      tr.innerHTML = `
+        <td style="color: var(--text-dim); font-size: 0.8rem;">#${r.id}</td>
+        <td style="font-weight: 500;">${escapeHtml(r.filename)}</td>
+        <td>${statusBadge}</td>
+        <td>
+          <strong style="color: ${riskColor};">${r.risk_score}/100</strong>
+        </td>
+        <td style="color: #fbbf24; font-weight: 600;">${escapeHtml(r.amount || "N/A")}</td>
+        <td>${escapeHtml(r.app_name || "N/A")}</td>
+        <td style="color: var(--text-dim); font-size: 0.8rem;">${escapeHtml(r.engine_used || "")}</td>
+        <td style="text-align: right;">
+          <button class="delete-btn" onclick="deleteReceiptItem(${r.id})" title="Delete record">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error("Error fetching receipt history", err);
+  }
+}
+
+window.deleteReceiptItem = async function (id) {
+  try {
+    const res = await fetch(`/api/receipt-history/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      const row = document.getElementById(`receipt-row-${id}`);
+      if (row) row.remove();
+      showToast(`Receipt record #${id} removed.`, "info");
+    }
+  } catch (err) {
+    showToast("Error deleting item", "danger");
+  }
+};
+
+window.togglePasswordVisibility = function (inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.type = input.type === "password" ? "text" : "password";
+};
 
 /**
  * Toast Notification Utility
